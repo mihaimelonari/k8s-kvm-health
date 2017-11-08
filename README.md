@@ -1,11 +1,7 @@
 [![CircleCI](https://circleci.com/gh/giantswarm/k8s-kvm-health/tree/master.svg?style=shield)](https://circleci.com/gh/giantswarm/k8s-kvm-health/tree/master)
 # k8s-kvm-health
 
-Flannel-network-health serves as health endpoint for network configuration created by [flannel-operator](https://github.com/giantswarm/flannel-operator).
-
-* endpoint `/bridge-healthz` - check if interface `br-${CLUSTER_ID}` is present and if it has configured right ip address
-* endpoint `/flannel-healthz`- check if interface `flannel.${VNI}` is present and if it has configured right ip address
-
+k8s-kvm-health serves as health endpoint for k8s-kvm pod created by [kvm-operator](https://github.com/giantswarm/kvm-operator).
 
 ### How to build
 
