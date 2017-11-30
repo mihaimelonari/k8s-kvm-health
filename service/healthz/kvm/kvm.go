@@ -95,6 +95,7 @@ func (s *Service) healthCheck() (bool, string) {
 	message = fmt.Sprintf("Healthcheck for KVM has failed. KVM is not responding on  %s.", s.ip)
 
 	pinger.Count = pingCount
+	pinger.Timeout = time.Second * 1
 	pinger.SetPrivileged(true)
 	pinger.OnRecv = func(pkt *ping.Packet) {
 		// we got positive response
