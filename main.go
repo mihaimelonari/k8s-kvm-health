@@ -8,10 +8,7 @@ import (
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/microkit/command"
 	microserver "github.com/giantswarm/microkit/server"
-	"github.com/giantswarm/microkit/transaction"
 	"github.com/giantswarm/micrologger"
-	"github.com/giantswarm/microstorage"
-	"github.com/giantswarm/microstorage/memory"
 	"github.com/spf13/viper"
 	"os"
 )
@@ -50,7 +47,7 @@ func mainWithError() error {
 	// Create a new logger which is used by all packages.
 	var newLogger micrologger.Logger
 	{
-		loggerConfig := micrologger.DefaultConfig()
+		loggerConfig := micrologger.Config{}
 		loggerConfig.IOWriter = os.Stdout
 		newLogger, err = micrologger.New(loggerConfig)
 		if err != nil {
@@ -84,26 +81,6 @@ func mainWithError() error {
 			}
 		}
 
-		var storage microstorage.Storage
-		{
-			storage, err = memory.New(memory.DefaultConfig())
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		var transactionResponder transaction.Responder
-		{
-			c := transaction.DefaultResponderConfig()
-			c.Logger = newLogger
-			c.Storage = storage
-
-			transactionResponder, err = transaction.NewResponder(c)
-			if err != nil {
-				panic(err)
-			}
-		}
-
 		// Create a new custom server which bundles our endpoints.
 		var newServer microserver.Server
 		{
@@ -111,7 +88,6 @@ func mainWithError() error {
 
 			serverConfig.MicroServerConfig.Logger = newLogger
 			serverConfig.MicroServerConfig.ServiceName = name
-			serverConfig.MicroServerConfig.TransactionResponder = transactionResponder
 			serverConfig.MicroServerConfig.Viper = v
 			serverConfig.MicroServerConfig.ListenAddress = f.Service.ListenAddress
 			serverConfig.Service = newService
@@ -128,7 +104,7 @@ func mainWithError() error {
 	// Create a new microkit command which manages our custom microservice.
 	var newCommand command.Command
 	{
-		commandConfig := command.DefaultConfig()
+		commandConfig := command.Config{}
 
 		commandConfig.Logger = newLogger
 		commandConfig.ServerFactory = newServerFactory

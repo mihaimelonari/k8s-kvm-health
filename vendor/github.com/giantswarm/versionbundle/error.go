@@ -4,11 +4,18 @@ import (
 	"github.com/giantswarm/microerror"
 )
 
-var invalidAggregatedBundlesError = microerror.New("invalid aggregated bundles")
+var bundleNotFoundError = microerror.New("bundle not found")
 
-// IsInvalidAggregatedBundlesError asserts invalidAggregatedBundlesError.
-func IsInvalidAggregatedBundlesError(err error) bool {
-	return microerror.Cause(err) == invalidAggregatedBundlesError
+// IsBundleNotFound asserts bundleNotFoundError.
+func IsBundleNotFound(err error) bool {
+	return microerror.Cause(err) == bundleNotFoundError
+}
+
+var executionFailedError = microerror.New("execution failed")
+
+// IsExecutionFailed asserts executionFailedError.
+func IsExecutionFailed(err error) bool {
+	return microerror.Cause(err) == executionFailedError
 }
 
 var invalidBundleError = microerror.New("invalid bundle")
@@ -23,13 +30,6 @@ var invalidBundlesError = microerror.New("invalid bundles")
 // IsInvalidBundlesError asserts invalidBundlesError.
 func IsInvalidBundlesError(err error) bool {
 	return microerror.Cause(err) == invalidBundlesError
-}
-
-var invalidCapabilityError = microerror.New("invalid capability")
-
-// IsInvalidCapability asserts invalidCapabilityError.
-func IsInvalidCapability(err error) bool {
-	return microerror.Cause(err) == invalidCapabilityError
 }
 
 var invalidChangelogError = microerror.New("invalid changelog")
@@ -53,9 +53,9 @@ func IsInvalidConfig(err error) bool {
 	return microerror.Cause(err) == invalidConfigError
 }
 
-var invalidDependencyError = microerror.New("invalid dependency")
+var invalidReleaseError = microerror.New("invalid release")
 
-// IsInvalidDependency asserts invalidDependencyError.
-func IsInvalidDependency(err error) bool {
-	return microerror.Cause(err) == invalidDependencyError
+// IsInvalidRelease asserts invalidReleaseError.
+func IsInvalidRelease(err error) bool {
+	return microerror.Cause(err) == invalidReleaseError
 }

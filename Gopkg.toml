@@ -38,23 +38,15 @@
   name = "github.com/giantswarm/microkit"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/giantswarm/micrologger"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/giantswarm/microstorage"
-
-[[constraint]]
   name = "github.com/go-kit/kit"
-  version = "=0.5.0"
+  version = "=0.6.0"
 
 [[constraint]]
-  branch = "root-integration-tests"
+  branch = "master"
   name = "github.com/sparrc/go-ping"
 
 [[constraint]]
-  branch = "master"
+  version = "^1.0.0"
   name = "github.com/spf13/viper"
 
 [prune]

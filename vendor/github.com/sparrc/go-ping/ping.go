@@ -44,12 +44,11 @@
 package ping
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
 	"net"
-	"os"
-	"os/signal"
 	"sync"
 	"syscall"
 	"time"
@@ -84,18 +83,19 @@ func NewPinger(addr string) (*Pinger, error) {
 		ipv4 = false
 	}
 
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return &Pinger{
 		ipaddr:   ipaddr,
 		addr:     addr,
 		Interval: time.Second,
 		Timeout:  time.Second * 100000,
 		Count:    -1,
-
-		network: "udp",
-		ipv4:    ipv4,
-		size:    timeSliceLength,
-
-		done: make(chan bool),
+		id:       r.Intn(math.MaxInt16),
+		network:  "udp",
+		ipv4:     ipv4,
+		Size:     timeSliceLength,
+		Tracker:  r.Int63n(math.MaxInt64),
+		done:     make(chan bool),
 	}, nil
 }
 
@@ -131,6 +131,12 @@ type Pinger struct {
 	// OnFinish is called when Pinger exits
 	OnFinish func(*Statistics)
 
+	// Size of packet being sent
+	Size int
+
+	// Tracker: Used to uniquely identify packet when non-priviledged
+	Tracker int64
+
 	// stop chan bool
 	done chan bool
 
@@ -140,6 +146,7 @@ type Pinger struct {
 	ipv4     bool
 	source   string
 	size     int
+	id       int
 	sequence int
 	network  string
 }
@@ -156,6 +163,9 @@ type Packet struct {
 
 	// IPAddr is the address of the host being pinged.
 	IPAddr *net.IPAddr
+
+	// Addr is the string address of the host being pinged.
+	Addr string
 
 	// NBytes is the number of bytes in the message.
 	Nbytes int
@@ -276,6 +286,7 @@ func (p *Pinger) run() {
 
 	var wg sync.WaitGroup
 	recv := make(chan *packet, 5)
+	defer close(recv)
 	wg.Add(1)
 	go p.recvICMP(conn, recv, &wg)
 
@@ -285,15 +296,12 @@ func (p *Pinger) run() {
 	}
 
 	timeout := time.NewTicker(p.Timeout)
+	defer timeout.Stop()
 	interval := time.NewTicker(p.Interval)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	signal.Notify(c, syscall.SIGTERM)
+	defer interval.Stop()
 
 	for {
 		select {
-		case <-c:
-			close(p.done)
 		case <-p.done:
 			wg.Wait()
 			return
@@ -302,6 +310,9 @@ func (p *Pinger) run() {
 			wg.Wait()
 			return
 		case <-interval.C:
+			if p.Count > 0 && p.PacketsSent >= p.Count {
+				continue
+			}
 			err = p.sendICMP(conn)
 			if err != nil {
 				fmt.Println("FATAL: ", err.Error())
@@ -311,14 +322,17 @@ func (p *Pinger) run() {
 			if err != nil {
 				fmt.Println("FATAL: ", err.Error())
 			}
-		default:
-			if p.Count > 0 && p.PacketsRecv >= p.Count {
-				close(p.done)
-				wg.Wait()
-				return
-			}
+		}
+		if p.Count > 0 && p.PacketsRecv >= p.Count {
+			close(p.done)
+			wg.Wait()
+			return
 		}
 	}
+}
+
+func (p *Pinger) Stop() {
+	close(p.done)
 }
 
 func (p *Pinger) finish() {
@@ -427,14 +441,40 @@ func (p *Pinger) processPacket(recv *packet) error {
 		return nil
 	}
 
+	body := m.Body.(*icmp.Echo)
+	// If we are priviledged, we can match icmp.ID
+	if p.network == "ip" {
+		// Check if reply from same ID
+		if body.ID != p.id {
+			return nil
+		}
+	} else {
+		// If we are not priviledged, we cannot set ID - require kernel ping_table map
+		// need to use contents to identify packet
+		data := IcmpData{}
+		err := json.Unmarshal(body.Data, &data)
+		if err != nil {
+			return err
+		}
+		if data.Tracker != p.Tracker {
+			return nil
+		}
+	}
+
 	outPkt := &Packet{
 		Nbytes: recv.nbytes,
 		IPAddr: p.ipaddr,
+		Addr:   p.addr,
 	}
 
 	switch pkt := m.Body.(type) {
 	case *icmp.Echo:
-		outPkt.Rtt = time.Since(bytesToTime(pkt.Data[:timeSliceLength]))
+		data := IcmpData{}
+		err := json.Unmarshal(m.Body.(*icmp.Echo).Data, &data)
+		if err != nil {
+			return err
+		}
+		outPkt.Rtt = time.Since(bytesToTime(data.Bytes))
 		outPkt.Seq = pkt.Seq
 		p.PacketsRecv += 1
 	default:
@@ -452,6 +492,11 @@ func (p *Pinger) processPacket(recv *packet) error {
 	return nil
 }
 
+type IcmpData struct {
+	Bytes   []byte
+	Tracker int64
+}
+
 func (p *Pinger) sendICMP(conn *icmp.PacketConn) error {
 	var typ icmp.Type
 	if p.ipv4 {
@@ -466,17 +511,25 @@ func (p *Pinger) sendICMP(conn *icmp.PacketConn) error {
 	}
 
 	t := timeToBytes(time.Now())
-	if p.size-timeSliceLength != 0 {
-		t = append(t, byteSliceOfSize(p.size-timeSliceLength)...)
+	if p.Size-timeSliceLength != 0 {
+		t = append(t, byteSliceOfSize(p.Size-timeSliceLength)...)
 	}
-	bytes, err := (&icmp.Message{
-		Type: typ, Code: 0,
-		Body: &icmp.Echo{
-			ID:   rand.Intn(65535),
-			Seq:  p.sequence,
-			Data: t,
-		},
-	}).Marshal(nil)
+
+	data, err := json.Marshal(IcmpData{Bytes: t, Tracker: p.Tracker})
+	if err != nil {
+		return fmt.Errorf("Unable to marshal data %s", err)
+	}
+	body := &icmp.Echo{
+		ID:   p.id,
+		Seq:  p.sequence,
+		Data: data,
+	}
+	msg := &icmp.Message{
+		Type: typ,
+		Code: 0,
+		Body: body,
+	}
+	bytes, err := msg.Marshal(nil)
 	if err != nil {
 		return err
 	}

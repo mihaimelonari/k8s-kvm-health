@@ -32,7 +32,7 @@ func DefaultConfig() Config {
 		Service: nil,
 
 		// Settings.
-		MicroServerConfig: microserver.DefaultConfig(),
+		MicroServerConfig: microserver.Config{},
 	}
 }
 
