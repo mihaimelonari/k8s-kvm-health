@@ -7,6 +7,8 @@ import (
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
 	"github.com/sparrc/go-ping"
+	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -18,31 +20,27 @@ const (
 	Name = "kvmHealthz"
 
 	// config
-	pingCount = 1
+	pingCount      = 1
+	httpsScheme    = "https"
+	httpScheme     = "http"
+	k8sAPIPort     = 443
+	k8sKubeletPort = 10248
 )
 
 // Config represents the configuration used to create a healthz service.
 type Config struct {
 	// Dependencies.
-	IP     string
-	Logger micrologger.Logger
-}
-
-// DefaultConfig provides a default configuration to create a new healthz service
-// by best effort.
-func DefaultConfig() Config {
-	return Config{
-		// Dependencies.
-		IP:     "",
-		Logger: nil,
-	}
+	CheckAPI bool
+	IP       string
+	Logger   micrologger.Logger
 }
 
 // Service implements the healthz service interface.
 type Service struct {
 	// Dependencies.
-	ip     string
-	logger micrologger.Logger
+	checkAPI bool
+	ip       string
+	logger   micrologger.Logger
 
 	// Settings.
 	timeout time.Duration
@@ -60,29 +58,49 @@ func New(config Config) (*Service, error) {
 
 	newService := &Service{
 		// Dependencies.
-		ip:     config.IP,
-		logger: config.Logger,
+		checkAPI: config.CheckAPI,
+		ip:       config.IP,
+		logger:   config.Logger,
 	}
 
 	return newService, nil
 }
 
-// GetHealthz implements the health check for network interface.
+// GetHealthz Provides Healthz implementation to check health status of network
+// interface. It performs following checks in given order:
+//  - Ping configured IP.
+//  - Check that Kubelet instance in configured IP responds to HTTP request.
+//  - Check that K8s API in configured IP responds to HTTPS request.
 func (s *Service) GetHealthz(ctx context.Context) (healthz.Response, error) {
-	failed, message := s.healthCheck()
+	var apiFailed, kubeletFailed, pingFailed bool
+	var apiMsg, kubeletMsg, pingMsg string
+	pingFailed, pingMsg = s.pingHealthCheck()
 
 	response := healthz.Response{
 		Description: Description,
-		Failed:      failed,
-		Message:     message,
+		Failed:      pingFailed,
+		Message:     pingMsg,
 		Name:        Name,
+	}
+
+	// check kubelet only if ping succeeded
+	if !pingFailed {
+		kubeletFailed, kubeletMsg = s.httpHealthCheck(k8sKubeletPort, httpScheme)
+		response.Failed = kubeletFailed
+		response.Message += kubeletMsg
+	}
+
+	// check api only if ping and kubelet succeeded
+	if !pingFailed && !kubeletFailed && s.checkAPI {
+		apiFailed, apiMsg = s.httpHealthCheck(k8sAPIPort, httpsScheme)
+		response.Failed = apiFailed
+		response.Message += apiMsg
 	}
 
 	return response, nil
 }
 
-// implementation fo the interface healthz logic
-func (s *Service) healthCheck() (bool, string) {
+func (s *Service) pingHealthCheck() (bool, string) {
 	var message string
 	// ping kvm
 	pinger, err := ping.NewPinger(s.ip)
@@ -107,4 +125,23 @@ func (s *Service) healthCheck() (bool, string) {
 
 	// exit
 	return failed, message
+}
+
+func (s *Service) httpHealthCheck(port int, scheme string) (bool, string) {
+	var message string
+	u := url.URL{
+		Host:   fmt.Sprintf("%s:%d", s.ip, port),
+		Path:   "healthz",
+		Scheme: scheme,
+	}
+	// send request to http endpoint
+	_, err := http.Get(u.String())
+	if err != nil {
+		message = fmt.Sprintf("Failed to send http request to endpoint %s. %s", u.String(), err)
+		return true, message
+	}
+
+	message = fmt.Sprintf("Healthcheck for http endpoint %s has been successful.", u.String())
+	// exit
+	return false, message
 }

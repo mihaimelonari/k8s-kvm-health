@@ -6,6 +6,7 @@ import (
 	"github.com/giantswarm/microendpoint/service/version"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
+	"strings"
 	"sync"
 )
 
@@ -60,10 +61,15 @@ func New(config Config) (*Service, error) {
 
 	var healthzService *healthz.Service
 	{
-		healthzConfig := healthz.DefaultConfig()
+		healthzConfig := healthz.Config{
+			CheckAPI:  false,
+			IPAddress: config.Flag.Service.IPAddress,
+			Logger:    config.Logger,
+		}
 
-		healthzConfig.IPAddress = config.Flag.Service.IPAddress
-		healthzConfig.Logger = config.Logger
+		if config.Flag.Service.CheckAPI == strings.ToLower("true") {
+			healthzConfig.CheckAPI = true
+		}
 
 		healthzService, err = healthz.New(healthzConfig)
 		if err != nil {
