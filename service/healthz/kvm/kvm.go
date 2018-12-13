@@ -2,6 +2,7 @@ package kvm
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/giantswarm/microendpoint/service/healthz"
 	"github.com/giantswarm/microerror"
@@ -134,8 +135,13 @@ func (s *Service) httpHealthCheck(port int, scheme string) (bool, string) {
 		Path:   "healthz",
 		Scheme: scheme,
 	}
+	// we are accessing k8s api on machine IP, but as that ip is dynamic and not part of ssl so we need to skip TLS check
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	// send request to http endpoint
-	_, err := http.Get(u.String())
+	_, err := client.Get(u.String())
 	if err != nil {
 		message = fmt.Sprintf("Failed to send http request to endpoint %s. %s", u.String(), err)
 		return true, message
