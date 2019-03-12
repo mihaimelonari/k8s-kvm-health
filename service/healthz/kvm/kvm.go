@@ -21,11 +21,12 @@ const (
 	Name = "kvmHealthz"
 
 	// config
-	pingCount      = 1
-	httpsScheme    = "https"
-	httpScheme     = "http"
-	k8sAPIPort     = 443
-	k8sKubeletPort = 10248
+	pingCount         = 1
+	httpsScheme       = "https"
+	httpScheme        = "http"
+	k8sAPIPort        = 443
+	k8sKubeletPort    = 10248
+	maxIdleConnection = 10
 )
 
 // Config represents the configuration used to create a healthz service.
@@ -40,8 +41,10 @@ type Config struct {
 type Service struct {
 	// Dependencies.
 	checkAPI bool
+	client   *http.Client
 	ip       string
 	logger   micrologger.Logger
+	tr       *http.Transport
 
 	// Settings.
 	timeout time.Duration
@@ -57,11 +60,18 @@ func New(config Config) (*Service, error) {
 		return nil, microerror.Maskf(invalidConfigError, "config.Logger must not be empty")
 	}
 
+	tr := &http.Transport{
+		MaxConnsPerHost: maxIdleConnection,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	newService := &Service{
 		// Dependencies.
 		checkAPI: config.CheckAPI,
+		client:   &http.Client{Transport: tr},
 		ip:       config.IP,
 		logger:   config.Logger,
+		tr:       tr,
 	}
 
 	return newService, nil
@@ -88,14 +98,14 @@ func (s *Service) GetHealthz(ctx context.Context) (healthz.Response, error) {
 	if !pingFailed {
 		kubeletFailed, kubeletMsg = s.httpHealthCheck(k8sKubeletPort, httpScheme)
 		response.Failed = kubeletFailed
-		response.Message += kubeletMsg
+		response.Message = kubeletMsg
 	}
 
 	// check api only if ping and kubelet succeeded
 	if !pingFailed && !kubeletFailed && s.checkAPI {
 		apiFailed, apiMsg = s.httpHealthCheck(k8sAPIPort, httpsScheme)
 		response.Failed = apiFailed
-		response.Message += apiMsg
+		response.Message = apiMsg
 	}
 
 	return response, nil
@@ -135,13 +145,10 @@ func (s *Service) httpHealthCheck(port int, scheme string) (bool, string) {
 		Path:   "healthz",
 		Scheme: scheme,
 	}
-	// we are accessing k8s api on machine IP, but as that ip is dynamic and not part of ssl so we need to skip TLS check
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
+	// be sure to close idle connection after health check is finished
+	defer s.tr.CloseIdleConnections()
 	// send request to http endpoint
-	_, err := client.Get(u.String())
+	_, err := s.client.Get(u.String())
 	if err != nil {
 		message = fmt.Sprintf("Failed to send http request to endpoint %s. %s", u.String(), err)
 		return true, message
