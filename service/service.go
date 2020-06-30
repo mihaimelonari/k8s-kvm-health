@@ -1,13 +1,15 @@
 package service
 
 import (
-	"github.com/giantswarm/k8s-kvm-health/flag"
-	"github.com/giantswarm/k8s-kvm-health/service/healthz"
+	"strings"
+	"sync"
+
 	"github.com/giantswarm/microendpoint/service/version"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
-	"strings"
-	"sync"
+
+	"github.com/giantswarm/k8s-kvm-health/flag"
+	"github.com/giantswarm/k8s-kvm-health/service/healthz"
 )
 
 // Config represents the configuration used to create a new service.

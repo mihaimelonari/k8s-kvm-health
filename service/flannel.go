@@ -2,14 +2,15 @@ package service
 
 import (
 	"fmt"
-	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/micrologger"
 	"io/ioutil"
 	"net"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/giantswarm/microerror"
+	"github.com/giantswarm/micrologger"
 )
 
 const (
@@ -34,7 +35,7 @@ func (c *Config) LoadFlannelConfig() error {
 		return microerror.Mask(err)
 	}
 	// debug output
-	c.Logger.Log("debug", fmt.Sprintf("Loaded Config: %+v", c.Flag.Service))
+	_ = c.Logger.Log("debug", fmt.Sprintf("Loaded Config: %+v", c.Flag.Service))
 	return nil
 }
 
@@ -86,7 +87,7 @@ func (c *Config) waitForFlannelFile(newLogger micrologger.Logger) error {
 		if _, err := os.Stat(c.Flag.Service.FlannelFile); !os.IsNotExist(err) {
 			break
 		}
-		newLogger.Log("debug", fmt.Sprintf("Waiting for file '%s' to be created.", c.Flag.Service.FlannelFile))
+		_ = newLogger.Log("debug", fmt.Sprintf("Waiting for file '%s' to be created.", c.Flag.Service.FlannelFile))
 		time.Sleep(1 * time.Second)
 	}
 	// all good

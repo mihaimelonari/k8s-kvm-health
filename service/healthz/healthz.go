@@ -1,10 +1,11 @@
 package healthz
 
 import (
-	"github.com/giantswarm/k8s-kvm-health/service/healthz/kvm"
 	"github.com/giantswarm/microendpoint/service/healthz"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
+
+	"github.com/giantswarm/k8s-kvm-health/service/healthz/kvm"
 )
 
 // Config represents the configuration used to create a healthz service.

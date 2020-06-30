@@ -1,10 +1,12 @@
 package service
 
 import (
-	"github.com/giantswarm/k8s-kvm-health/flag"
-	"github.com/giantswarm/microerror"
 	"strings"
 	"testing"
+
+	"github.com/giantswarm/microerror"
+
+	"github.com/giantswarm/k8s-kvm-health/flag"
 )
 
 func Test_Flannel_ParseIP(t *testing.T) {

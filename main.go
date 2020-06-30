@@ -2,15 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/giantswarm/k8s-kvm-health/flag"
-	"github.com/giantswarm/k8s-kvm-health/server"
-	"github.com/giantswarm/k8s-kvm-health/service"
+	"os"
+
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/microkit/command"
 	microserver "github.com/giantswarm/microkit/server"
 	"github.com/giantswarm/micrologger"
 	"github.com/spf13/viper"
-	"os"
+
+	"github.com/giantswarm/k8s-kvm-health/flag"
+	"github.com/giantswarm/k8s-kvm-health/server"
+	"github.com/giantswarm/k8s-kvm-health/service"
 )
 
 var (
@@ -121,7 +123,10 @@ func mainWithError() error {
 		}
 	}
 
-	newCommand.CobraCommand().Execute()
+	err = newCommand.CobraCommand().Execute()
+	if err != nil {
+		panic(err)
+	}
 
 	return nil
 }

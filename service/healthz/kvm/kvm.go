@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/giantswarm/microendpoint/service/healthz"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
 	"github.com/sparrc/go-ping"
-	"net/http"
-	"net/url"
-	"time"
 )
 
 const (
@@ -46,9 +47,6 @@ type Service struct {
 	ip       string
 	logger   micrologger.Logger
 	tr       *http.Transport
-
-	// Settings.
-	timeout time.Duration
 }
 
 // New creates a new configured healthz service.
@@ -62,7 +60,7 @@ func New(config Config) (*Service, error) {
 	}
 
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // nolint
 		MaxIdleConns:    maxIdleConnection,
 	}
 

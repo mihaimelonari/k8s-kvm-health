@@ -1,8 +1,9 @@
 package flag
 
 import (
-	"github.com/giantswarm/k8s-kvm-health/flag/service"
 	"github.com/giantswarm/microkit/flag"
+
+	"github.com/giantswarm/k8s-kvm-health/flag/service"
 )
 
 type Flag struct {
